@@ -1,7 +1,15 @@
+#include <TFT.h> // Hardware-specific library
+#include <SPI.h>
+
+// macro for TFT
+#define CS   10
+#define DC   9
+#define RESET  8  
+
 // defines pins numbers
-int buzzPin = 8;
-int trigPin = 9;
-int echoPin = 10;
+int buzzPin = 2;
+int trigPin = 3;
+int echoPin = 4;
 
 // defines variables
 // the variables for ultrasonic sensor
@@ -9,11 +17,16 @@ long duration;
 int distance;
 
 // count the number of push-up
-int count;
+int count = 0;
 
 // the variables for push up detection
 int flag1 = 1;
 int flag2 = 1;
+
+// Initialize screen object
+TFT screen = TFT(CS, DC, RESET);
+
+char charBuf[50];
 
 void setup() {
   // put your setup code here, to run once:
@@ -25,6 +38,14 @@ void setup() {
   // buzz connection configuration
   pinMode(buzzPin, OUTPUT);
 
+  // initialize the screen
+  screen.begin();  
+  screen.background(255, 255, 255);  // clear the screen with black
+  screen.stroke(0, 0, 0);
+  screen.text("Count:", 30, 30);
+  String string = String(count);
+  string.toCharArray(charBuf, 50);
+  screen.text(charBuf, 70, 30);
 
   Serial.begin(9600); // Starts the serial communication
 }
@@ -43,10 +64,22 @@ void loop() {
     flag2 = 1;
     if (flag2 != flag1){
       flag1 = 1;
+
+      // buzz
       tone(buzzPin, 1000); // Send 1KHz sound signal
       delay(50);        
       noTone(buzzPin);     // Stop sound
       delay(50);
+
+      // display the updated count  
+      screen.stroke(255, 255, 255);
+      screen.text(charBuf, 70, 30);
+      count = count + 1;
+      screen.stroke(0, 0, 0);
+      String string = String(count);
+      string.toCharArray(charBuf, 50);
+      screen.text(charBuf, 70, 30);
+     
     }
   }
 
