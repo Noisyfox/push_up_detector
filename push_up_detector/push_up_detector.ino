@@ -7,9 +7,9 @@
 #define RESET  8  
 
 // defines pins numbers
-int buzzPin = 2;
-int trigPin = 3;
-int echoPin = 4;
+int buzzPin = 3;
+int trigPin = 4;
+int echoPin = 5;
 
 // defines variables
 // the variables for ultrasonic sensor
@@ -25,12 +25,10 @@ int flag2 = 1;
 
 // Initialize screen object
 TFT screen = TFT(CS, DC, RESET);
-
 char charBuf[50];
 
 void setup() {
   // put your setup code here, to run once:
-
   // Ultrasonic sensor connection configuration
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -53,8 +51,6 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   distance = ultrasonic_sensor_data (trigPin, echoPin);
-
-  Serial.println(distance);
 
   if (distance < 20){
     flag1 = 0;
@@ -79,10 +75,8 @@ void loop() {
       String string = String(count);
       string.toCharArray(charBuf, 50);
       screen.text(charBuf, 70, 30);
-     
     }
   }
-
   delay(100);
 }
 
@@ -104,4 +98,6 @@ int ultrasonic_sensor_data (int trigPin, int echoPin) {
 
   return distance;
 }
+
+
 
