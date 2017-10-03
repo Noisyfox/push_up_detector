@@ -7,9 +7,11 @@
 #define RESET  8  
 
 // defines pins numbers
-int buzzPin = 3;
-int trigPin = 4;
-int echoPin = 5;
+int buzzPin = 5;
+int trigPin = 6;
+int echoPin = 7;
+int on = 2; // interrupt can only be triggered on Pin 2 and 3
+int off = 3;
 
 // defines variables
 // the variables for ultrasonic sensor
@@ -26,6 +28,9 @@ int flag2 = 1;
 // Initialize screen object
 TFT screen = TFT(CS, DC, RESET);
 char charBuf[50];
+
+// start flag
+int start = 0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -45,39 +50,49 @@ void setup() {
   string.toCharArray(charBuf, 50);
   screen.text(charBuf, 70, 30);
 
+  // configure on/off
+  pinMode(on, INPUT);
+  pinMode(off, INPUT);
+  attachInterrupt(digitalPinToInterrupt(on), on_handler, FALLING);
+  attachInterrupt(digitalPinToInterrupt(off), off_handler, FALLING);
+
   Serial.begin(9600); // Starts the serial communication
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+  if (start == 1){
   distance = ultrasonic_sensor_data (trigPin, echoPin);
 
   if (distance < 20){
-    flag1 = 0;
-    flag2 = 0; 
-  }
-  else {
-    flag2 = 1;
-    if (flag2 != flag1){
-      flag1 = 1;
-
-      // buzz
-      tone(buzzPin, 1000); // Send 1KHz sound signal
-      delay(50);        
-      noTone(buzzPin);     // Stop sound
-      delay(50);
-
-      // display the updated count  
-      screen.stroke(255, 255, 255);
-      screen.text(charBuf, 70, 30);
-      count = count + 1;
-      screen.stroke(0, 0, 0);
-      String string = String(count);
-      string.toCharArray(charBuf, 50);
-      screen.text(charBuf, 70, 30);
+      flag1 = 0;
+      flag2 = 0; 
     }
+    else {
+      flag2 = 1;
+      if (flag2 != flag1){
+        flag1 = 1;
+  
+        // buzz
+        tone(buzzPin, 1000); // Send 1KHz sound signal
+        delay(50);        
+        noTone(buzzPin);     // Stop sound
+        delay(50);
+  
+        // display the updated count  
+        screen.stroke(255, 255, 255);
+        screen.text(charBuf, 70, 30);
+        count = count + 1;
+        screen.stroke(0, 0, 0);
+        String string = String(count);
+        string.toCharArray(charBuf, 50);
+        screen.text(charBuf, 70, 30);
+      }
+    }
+    delay(100);
   }
-  delay(100);
+
+  Serial.println(start);
 }
 
 int ultrasonic_sensor_data (int trigPin, int echoPin) {
@@ -97,6 +112,23 @@ int ultrasonic_sensor_data (int trigPin, int echoPin) {
   distance = duration * 0.034 / 2;
 
   return distance;
+}
+
+void on_handler(){
+  start = 1;
+}
+
+void off_handler(){
+  start = 0;
+
+  // clear the count
+  screen.stroke(255, 255, 255);
+  screen.text(charBuf, 70, 30);
+  count = 0;
+  screen.stroke(0, 0, 0);
+  String string = String(count);
+  string.toCharArray(charBuf, 50);
+  screen.text(charBuf, 70, 30);
 }
 
 
