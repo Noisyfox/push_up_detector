@@ -98,8 +98,17 @@ int flag2 = 1;
 TFT screen = TFT(CS, DC, RESET);
 char charBuf[50];
 
+
+enum EState{
+  s_init,
+  s_stopped,
+  s_counting,
+  s_paring  
+};
+
 // start flag
-boolean start = false;
+volatile EState state = s_init;
+volatile EState next_state = s_stopped;
 
 void setup() {
   // put your setup code here, to run once:
@@ -111,13 +120,7 @@ void setup() {
   pinMode(PIN_BUZZ, OUTPUT);
 
   // initialize the screen
-  screen.begin();  
-  screen.background(255, 255, 255);  // clear the screen with black
-  screen.stroke(0, 0, 0);
-  screen.text("Count:", 30, 30);
-  String string = String(count);
-  string.toCharArray(charBuf, 50);
-  screen.text(charBuf, 70, 30);
+  screen.begin();
 
   // configure button
   mainBtn.Setup();
@@ -127,8 +130,87 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  if (start){
+  EState currentState = state;
+  EState nextState = next_state;
+  state = nextState;
+  
+  if(currentState != nextState){
+    switch(nextState){
+      case s_stopped:
+        EnterStopped();
+        break;
+      case s_counting:
+        EnterCounting();
+        break;
+    }
+  }
+
+  switch(nextState){
+    case s_counting:
+      OnCounting();
+      break;
+  }
+}
+
+int ultrasonic_sensor_data (int trigPin, int echoPin) {
+  // Clears the trigPin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  
+  // Sets the trigPin on HIGH state for 10 micro seconds to ultrasonic sound
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  
+  // Calculating the distance measured in centimeter
+  distance = duration * 0.034 / 2;
+
+  return distance;
+}
+
+void mainBtnISR(){
+  mainBtn.OnInterrupt();
+
+  if(mainBtn.IsShortClicked()){
+    switch(state){
+      case s_init:
+      case s_paring:
+        break;
+      case s_stopped:
+        next_state = s_counting;
+        break;
+      case s_counting:
+        next_state = s_stopped;
+        break;
+    }
+  }
+
+//  Serial.println(start);
+}
+
+void EnterStopped(){
+  // clear the count
+  screen.background(255, 255, 255);
+  screen.stroke(0, 0, 0);
+  screen.text("Stopped.", 30, 30);
+}
+
+void EnterCounting(){
+  // Clear count number
+  count = 0;
+  
+  screen.background(255, 255, 255);  // clear the screen with white
+  screen.stroke(0, 0, 0);
+  screen.text("Count:", 30, 30);
+  String string = String(count);
+  string.toCharArray(charBuf, 50);
+  screen.text(charBuf, 70, 30);
+}
+
+void OnCounting(){
     distance = ultrasonic_sensor_data (PIN_TRIG, PIN_ECHO);
 
     if (distance < 20){
@@ -157,45 +239,5 @@ void loop() {
       }
     }
     delay(100);
-  }
-}
-
-int ultrasonic_sensor_data (int trigPin, int echoPin) {
-  // Clears the trigPin
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  
-  // Sets the trigPin on HIGH state for 10 micro seconds to ultrasonic sound
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  
-  // Reads the echoPin, returns the sound wave travel time in microseconds
-  duration = pulseIn(echoPin, HIGH);
-  
-  // Calculating the distance measured in centimeter
-  distance = duration * 0.034 / 2;
-
-  return distance;
-}
-
-void mainBtnISR(){
-  mainBtn.OnInterrupt();
-
-  if(mainBtn.IsShortClicked()){
-    start = !start;
-    if(!start){
-      // clear the count
-      screen.stroke(255, 255, 255);
-      screen.text(charBuf, 70, 30);
-      count = 0;
-      screen.stroke(0, 0, 0);
-      String string = String(count);
-      string.toCharArray(charBuf, 50);
-      screen.text(charBuf, 70, 30);
-    }
-  }
-
-  Serial.println(start);
 }
 
