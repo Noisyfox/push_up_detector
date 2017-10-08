@@ -1,6 +1,73 @@
 #include <TFT.h> // Hardware-specific library
 #include <SPI.h>
 
+class Btn {
+private:
+  volatile byte state = LOW;
+  //storing the button state for short press mode
+  volatile byte state_short = LOW;
+  //storing the button state for long press mode
+  volatile byte state_long = LOW;
+  
+  byte mPin;
+  unsigned long mLongPressMills;
+  
+  //stores the time each button went high or low
+  volatile unsigned long current_high;
+  volatile unsigned long current_low;
+
+public:
+  Btn(byte pin, unsigned long long_press_mills):mPin(pin), mLongPressMills(long_press_mills){
+  }
+
+  void Setup(){
+    pinMode(mPin, INPUT);
+  }
+
+  void OnInterrupt(){
+    //if this is true the button was just pressed down
+    if(digitalRead(mPin) == LOW)
+    {
+      //note the time the button was pressed
+      current_high = millis();
+      state = HIGH;
+      state_short = LOW;
+      state_long = LOW;
+    }
+    //if no button is high one had to be released. The millis function will increase while a button is hold down the loop function will be cycled (no change, so no interrupt is active) 
+     if(digitalRead(mPin) == HIGH && state == HIGH)
+    {
+      current_low = millis();
+      if((current_low - current_high) > 50 && (current_low - current_high) < mLongPressMills)
+      {
+        state_short = HIGH;
+        state = LOW;
+      }
+      else if((current_low - current_high) >= mLongPressMills && (current_low - current_high) < 20000)
+      {
+        state_long = HIGH;
+        state = LOW;
+      }
+    }
+  }
+
+  boolean IsLongClicked(){
+    if(state_long == HIGH){
+      state_long = LOW;
+      return true;
+    }
+    return false;
+  }
+
+  boolean IsShortClicked(){
+    if(state_short == HIGH){
+      state_short = LOW;
+      return true;
+    }
+    return false;
+  }
+};
+
 // macro for TFT
 #define CS   10
 #define DC   9
@@ -10,8 +77,10 @@
 int buzzPin = 5;
 int trigPin = 6;
 int echoPin = 7;
-int on = 2; // interrupt can only be triggered on Pin 2 and 3
-int off = 3;
+int mainBtnPin = 2; // interrupt can only be triggered on Pin 2 and 3
+
+// defines buttons
+Btn mainBtn(mainBtnPin, 2000);
 
 // defines variables
 // the variables for ultrasonic sensor
@@ -30,7 +99,7 @@ TFT screen = TFT(CS, DC, RESET);
 char charBuf[50];
 
 // start flag
-int start = 0;
+boolean start = false;
 
 void setup() {
   // put your setup code here, to run once:
@@ -50,18 +119,16 @@ void setup() {
   string.toCharArray(charBuf, 50);
   screen.text(charBuf, 70, 30);
 
-  // configure on/off
-  pinMode(on, INPUT);
-  pinMode(off, INPUT);
-  attachInterrupt(digitalPinToInterrupt(on), on_handler, FALLING);
-  attachInterrupt(digitalPinToInterrupt(off), off_handler, FALLING);
+  // configure button
+  mainBtn.Setup();
+  attachInterrupt(digitalPinToInterrupt(mainBtnPin), mainBtnISR, CHANGE);
 
   Serial.begin(9600); // Starts the serial communication
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  if (start == 1){
+  if (start){
   distance = ultrasonic_sensor_data (trigPin, echoPin);
 
   if (distance < 20){
@@ -114,22 +181,21 @@ int ultrasonic_sensor_data (int trigPin, int echoPin) {
   return distance;
 }
 
-void on_handler(){
-  start = 1;
+void mainBtnISR(){
+  mainBtn.OnInterrupt();
+
+  if(mainBtn.IsShortClicked()){
+    start = !start;
+    if(!start){
+      // clear the count
+      screen.stroke(255, 255, 255);
+      screen.text(charBuf, 70, 30);
+      count = 0;
+      screen.stroke(0, 0, 0);
+      String string = String(count);
+      string.toCharArray(charBuf, 50);
+      screen.text(charBuf, 70, 30);
+    }
+  }
 }
-
-void off_handler(){
-  start = 0;
-
-  // clear the count
-  screen.stroke(255, 255, 255);
-  screen.text(charBuf, 70, 30);
-  count = 0;
-  screen.stroke(0, 0, 0);
-  String string = String(count);
-  string.toCharArray(charBuf, 50);
-  screen.text(charBuf, 70, 30);
-}
-
-
 
