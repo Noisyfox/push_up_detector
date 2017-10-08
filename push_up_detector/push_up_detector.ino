@@ -142,12 +142,18 @@ void loop() {
       case s_counting:
         EnterCounting();
         break;
+      case s_paring:
+        EnterParing();
+        break;
     }
   }
 
   switch(nextState){
     case s_counting:
       OnCounting();
+      break;
+    case s_paring:
+      OnParing();
       break;
   }
 }
@@ -186,13 +192,22 @@ void mainBtnISR(){
         next_state = s_stopped;
         break;
     }
+  } else if(mainBtn.IsLongClicked()){
+    switch(state){
+      case s_init:
+      case s_paring:
+      case s_counting:
+        break;
+      case s_stopped:
+        next_state = s_paring;
+        break;
+    }
   }
 
 //  Serial.println(start);
 }
 
 void EnterStopped(){
-  // clear the count
   screen.background(255, 255, 255);
   screen.stroke(0, 0, 0);
   screen.text("Stopped.", 30, 30);
@@ -239,5 +254,17 @@ void OnCounting(){
       }
     }
     delay(100);
+}
+
+void EnterParing(){
+  screen.background(255, 255, 255);
+  screen.stroke(0, 0, 0);
+  screen.text("Paring...", 30, 30);
+  
+  // Setup wifi as AP mode and open a port for listening.
+}
+
+void OnParing(){
+  // Read socket and process command from mobile application
 }
 
