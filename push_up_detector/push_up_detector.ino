@@ -74,13 +74,13 @@ public:
 #define RESET  8  
 
 // defines pins numbers
-int buzzPin = 5;
-int trigPin = 6;
-int echoPin = 7;
-int mainBtnPin = 2; // interrupt can only be triggered on Pin 2 and 3
+#define PIN_BUZZ 5
+#define PIN_TRIG 6
+#define PIN_ECHO 7
+#define PIN_BTN_MAIN 2 // interrupt can only be triggered on Pin 2 and 3
 
 // defines buttons
-Btn mainBtn(mainBtnPin, 2000);
+Btn mainBtn(PIN_BTN_MAIN, 2000);
 
 // defines variables
 // the variables for ultrasonic sensor
@@ -104,11 +104,11 @@ boolean start = false;
 void setup() {
   // put your setup code here, to run once:
   // Ultrasonic sensor connection configuration
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
+  pinMode(PIN_TRIG, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
 
   // buzz connection configuration
-  pinMode(buzzPin, OUTPUT);
+  pinMode(PIN_BUZZ, OUTPUT);
 
   // initialize the screen
   screen.begin();  
@@ -121,7 +121,7 @@ void setup() {
 
   // configure button
   mainBtn.Setup();
-  attachInterrupt(digitalPinToInterrupt(mainBtnPin), mainBtnISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_BTN_MAIN), mainBtnISR, CHANGE);
 
   Serial.begin(9600); // Starts the serial communication
 }
@@ -129,9 +129,9 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   if (start){
-  distance = ultrasonic_sensor_data (trigPin, echoPin);
+    distance = ultrasonic_sensor_data (PIN_TRIG, PIN_ECHO);
 
-  if (distance < 20){
+    if (distance < 20){
       flag1 = 0;
       flag2 = 0; 
     }
@@ -141,9 +141,9 @@ void loop() {
         flag1 = 1;
   
         // buzz
-        tone(buzzPin, 1000); // Send 1KHz sound signal
+        tone(PIN_BUZZ, 1000); // Send 1KHz sound signal
         delay(50);        
-        noTone(buzzPin);     // Stop sound
+        noTone(PIN_BUZZ);     // Stop sound
         delay(50);
   
         // display the updated count  
@@ -158,8 +158,6 @@ void loop() {
     }
     delay(100);
   }
-
-  Serial.println(start);
 }
 
 int ultrasonic_sensor_data (int trigPin, int echoPin) {
@@ -197,5 +195,7 @@ void mainBtnISR(){
       screen.text(charBuf, 70, 30);
     }
   }
+
+  Serial.println(start);
 }
 
