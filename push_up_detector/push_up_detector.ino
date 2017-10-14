@@ -170,10 +170,10 @@ void setup() {
   wifiSerial.begin(9600);
   WiFi.init(&wifiSerial);
   if(WiFi.status() == WL_NO_SHIELD){
-    DBG("Module have no response.\n\r");
-    error("WiFi reset failed.");
+    DBG(F("Module have no response.\n\r"));
+    error(F("WiFi reset failed."));
   } else {
-    DBG("Module is ready.\n\r");
+    DBG(F("Module is ready.\n\r"));
   }
 }
 
@@ -337,7 +337,7 @@ void EnterPairing(){
   }
   AP_name.toCharArray(charBuf, 50);
   if(WiFi.beginAP(charBuf) != WL_CONNECTED){
-    error("Config AP failed.");
+    error(F("Config AP failed."));
   }
   ("SSID:" + AP_name).toCharArray(charBuf, 50);
   screen.text(charBuf, 20, 50);
@@ -361,6 +361,9 @@ void EEPROM_WriteStr(int addr, const char* str, int maxLen){
   }
   
   EEPROM.write(addr + len, '\0');
+
+  DBG(String(str));
+//  DBG("Saved at address
 }
 
 void EEPROM_ReadStr(int addr, char* str, int maxLen){
@@ -394,35 +397,35 @@ void OnPairing(){
           // Execute command
           char* cp = command;
           if(strncmp(cp, "RST", 200) == 0){
-            client.println("OK");
+            client.println(F("OK"));
             next_state = s_init;
             return;
           } else if(MatchCommand("APSSID=", &cp)){ // Set AP SSID
             int len = strlen(cp);
             if(len == 0 || len > WiFiSSIDLen - 1){
-              client.println("ERROR: Wrong size.");
+              client.println(F("ERROR: Wrong size."));
             } else {
               EEPROM_WriteStr(ADDR_SSID, cp, WiFiSSIDLen - 1);
-              client.println("OK");
+              client.println(F("OK"));
             }
           } else if(MatchCommand("APPSW=", &cp)){ // Set AP password, if no password, send command "APPSW=".
             int len = strlen(cp);
             if(len > WiFiPSWLen - 1){
-              client.println("ERROR: Wrong size.");
+              client.println(F("ERROR: Wrong size."));
             } else {
               EEPROM_WriteStr(ADDR_PSW, cp, WiFiPSWLen - 1);
-              client.println("OK");
+              client.println(F("OK"));
             }
           } else {
-            client.println("ERROR: Unknown command.");
+            client.println(F("ERROR: Unknown command."));
           }
           
         } else {
           if(index >= 201) {
             // Error, too long
             index = 0;
-            client.println("ERROR: Command too long.");
-            DBG("Error: Command too long.\n\r");
+            client.println(F("ERROR: Command too long."));
+            DBG(F("Error: Command too long.\n\r"));
             client.flush();
           } else {
             command[index] = c;
