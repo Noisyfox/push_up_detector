@@ -3,6 +3,16 @@
 #include <TFT.h> // Hardware-specific library
 #include <SPI.h>
 
+#define DEBUG
+
+#ifdef DEBUG
+#define DBG(message)    Serial.print(message)
+#define DBGW(message)    Serial.write(message)
+#else
+#define DBG(message)
+#define DBGW(message)
+#endif // DEBUG
+
 class Btn {
 private:
   volatile byte state = LOW;
@@ -105,19 +115,59 @@ char charBuf[50];
 // WiFi serial
 SoftwareSerial wifi(PIN_WIFI_RX, PIN_WIFI_TX);
 
+// ========================================================================================================
+// Helper functions for WiFi
+
+bool WiFiConfMode(byte a) {
+  wifi.print("AT+CWMODE=");
+  wifi.println(String(a));
+  return WiFiWaitForOK();
+}
+
+bool WiFiWaitForOK() {
+  String data;
+  unsigned long start = millis();
+  while (millis() - start < 2000) {
+    if(wifi.available()>0) {
+      char a = wifi.read();
+      DBGW(a);
+      data = data + a;
+    }
+    if (data.indexOf("OK")!=-1 || data.indexOf("no change")!=-1) {
+      return true;
+    }
+    if (data.indexOf("ERROR")!=-1 || data.indexOf("busy")!=-1) {
+      return false;
+    }
+  }
+  return false;
+}
+
+// ========================================================================================================
+
 enum EState{
   s_init,
   s_stopped,
   s_counting,
-  s_paring  
+  s_pairing
 };
 
 // start flag
 volatile EState state = s_init;
 volatile EState next_state = s_stopped;
 
+void error(String msg){
+  screen.background(255, 255, 255);
+  screen.stroke(0, 0, 0);
+  msg.toCharArray(charBuf, 50);
+  screen.text(charBuf, 10, 30);
+  while(1);
+}
+
 void setup() {
   // put your setup code here, to run once:
+  randomSeed(analogRead(12));
+
   // Ultrasonic sensor connection configuration
   pinMode(PIN_TRIG, OUTPUT);
   pinMode(PIN_ECHO, INPUT);
@@ -133,7 +183,19 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_BTN_MAIN), mainBtnISR, CHANGE);
 
   Serial.begin(9600); // Starts the serial communication
+
+  // Init WiFi module
   wifi.begin(9600);
+  wifi.flush();
+  wifi.setTimeout(10000);
+  wifi.println("AT+RST");
+  boolean result = wifi.find("eady");
+  if(result){
+    DBG("Module is ready.\n\r");
+  }else{
+    DBG("Module have no response.\n\r");
+    error("WiFi reset failed.");
+  }
 }
 
 void loop() {
@@ -142,6 +204,11 @@ void loop() {
   state = nextState;
   
   if(currentState != nextState){
+    switch(currentState){
+      case s_init:
+        ExitInit();
+        break;
+    }
     switch(nextState){
       case s_stopped:
         EnterStopped();
@@ -149,18 +216,21 @@ void loop() {
       case s_counting:
         EnterCounting();
         break;
-      case s_paring:
-        EnterParing();
+      case s_pairing:
+        EnterPairing();
         break;
     }
   }
 
   switch(nextState){
+    case s_init:
+      next_state = s_stopped;
+      break;
     case s_counting:
       OnCounting();
       break;
-    case s_paring:
-      OnParing();
+    case s_pairing:
+      OnPairing();
       break;
   }
 
@@ -198,7 +268,7 @@ void mainBtnISR(){
   if(mainBtn.IsShortClicked()){
     switch(state){
       case s_init:
-      case s_paring:
+      case s_pairing:
         break;
       case s_stopped:
         next_state = s_counting;
@@ -210,16 +280,23 @@ void mainBtnISR(){
   } else if(mainBtn.IsLongClicked()){
     switch(state){
       case s_init:
-      case s_paring:
+      case s_pairing:
       case s_counting:
         break;
       case s_stopped:
-        next_state = s_paring;
+        next_state = s_pairing;
         break;
     }
   }
 
 //  Serial.println(start);
+}
+
+void ExitInit(){
+  // Setup WiFi to station mode and connect to saved AP
+  if(!WiFiConfMode(1)){
+    error("WiFiConfMode(1) failed.");
+  }
 }
 
 void EnterStopped(){
@@ -271,15 +348,33 @@ void OnCounting(){
     delay(100);
 }
 
-void EnterParing(){
+void EnterPairing(){
   screen.background(255, 255, 255);
   screen.stroke(0, 0, 0);
-  screen.text("Paring...", 30, 30);
+  screen.text("Pairing...", 20, 30);
   
   // Setup wifi as AP mode and open a port for listening.
+  if(!WiFiConfMode(2)){
+    error("WiFiConfMode(1) failed.");
+  }
+  // Set SSID
+  wifi.print("AT+CWSAP=\"");
+  String AP_name = "PUSHUP_";
+  for(int i = 0; i < 4; i++){
+    AP_name = AP_name + String(random(10));
+  }
+  wifi.print(AP_name);
+  wifi.println("\",\"\",11,0,1");
+  if(!WiFiWaitForOK()){
+    error("Config AP failed.");
+  }
+  ("SSID:" + AP_name).toCharArray(charBuf, 50);
+  screen.text(charBuf, 20, 50);
+
+  // TODO: Start socket?
 }
 
-void OnParing(){
+void OnPairing(){
   // Read socket and process command from mobile application
 }
 
