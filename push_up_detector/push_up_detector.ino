@@ -13,11 +13,11 @@
 #define DEBUG
 
 #ifdef DEBUG
-#define DBG(message)    Serial.print(message)
-#define DBGW(message)    Serial.write(message)
+#define DBG(...)    Serial.print(__VA_ARGS__)
+#define DBGW(...)    Serial.write(__VA_ARGS__)
 #else
-#define DBG(message)
-#define DBGW(message)
+#define DBG(...)
+#define DBGW(...)
 #endif // DEBUG
 
 class Btn {
@@ -103,8 +103,8 @@ public:
 // defines buttons
 Btn mainBtn(PIN_BTN_MAIN, 2000);
 
-#define WiFiSSIDLen 16
-#define WiFiPSWLen 16
+#define WiFiSSIDLen 128
+#define WiFiPSWLen 128
 #define ADDR_SSID 0
 #define ADDR_PSW WiFiSSIDLen
 
@@ -274,6 +274,18 @@ void mainBtnISR(){
 void ExitInit(){
   // Setup WiFi to station mode and connect to saved AP
   WiFi.reset();
+
+  // Read wifi config
+  char ssid[WiFiSSIDLen];
+  char psw[WiFiPSWLen];
+  EEPROM_ReadStr(ADDR_SSID, ssid, WiFiSSIDLen - 1);
+  EEPROM_ReadStr(ADDR_PSW, psw, WiFiPSWLen - 1);
+  
+  DBG(F("WiFi SSID:"));
+  DBG(ssid);
+  DBG(F("\r\nWiFi PSW:"));
+  DBG(psw);
+  DBG(F("\r\n"));
 }
 
 void EnterStopped(){
@@ -362,8 +374,11 @@ void EEPROM_WriteStr(int addr, const char* str, int maxLen){
   
   EEPROM.write(addr + len, '\0');
 
-  DBG(String(str));
-//  DBG("Saved at address
+  DBG(F("Saved \""));
+  DBG(str);
+  DBG(F("\" at address "));
+  DBG(addr, HEX);
+  DBG(F("\r\n"));
 }
 
 void EEPROM_ReadStr(int addr, char* str, int maxLen){
