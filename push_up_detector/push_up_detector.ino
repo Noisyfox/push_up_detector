@@ -1,3 +1,5 @@
+#include <EEPROM.h>
+
 #include <WiFiEsp.h>
 #include <WiFiEspClient.h>
 #include <WiFiEspServer.h>
@@ -100,6 +102,11 @@ public:
 
 // defines buttons
 Btn mainBtn(PIN_BTN_MAIN, 2000);
+
+#define WiFiSSIDLen 16
+#define WiFiPSWLen 16
+#define ADDR_SSID 0
+#define ADDR_PSW WiFiSSIDLen
 
 // defines variables
 // the variables for ultrasonic sensor
@@ -334,11 +341,96 @@ void EnterPairing(){
   }
   ("SSID:" + AP_name).toCharArray(charBuf, 50);
   screen.text(charBuf, 20, 50);
+}
 
-  // TODO: Start socket?
+boolean MatchCommand(const char* cmd, char** input){
+  if(strstr(*input, cmd) == *input){
+    *input += strlen(cmd);
+    return true;
+  }
+
+  return false;
+}
+
+void EEPROM_WriteStr(int addr, const char* str, int maxLen){
+  int len = strlen(str);
+  if(len > maxLen)len = maxLen;
+
+  for(int i = 0; i < len; i++){
+    EEPROM.write(addr + i, str[i]);
+  }
+  
+  EEPROM.write(addr + len, '\0');
+}
+
+void EEPROM_ReadStr(int addr, char* str, int maxLen){
+  int i;
+  for(i = 0; i < maxLen; i++) {
+    char c = EEPROM.read(addr + i);
+    if(c == '\0')break;
+    str[i] = c;
+  }
+  str[i] = '\0';
 }
 
 void OnPairing(){
   // Read socket and process command from mobile application
+  WiFiEspServer server(80);
+  server.begin();
+  while(1){
+    WiFiEspClient client = server.available();
+    if(!client){
+      continue;
+    }
+    char command[201];
+    int index = 0;
+    while (client.connected()) {
+      while(client.available()){
+        char c = client.read();
+        if(c == '\r' && index > 0 && command[index-1] == '\n') {
+          command[index - 1] = '\0';
+          index = 0;
+          
+          // Execute command
+          char* cp = command;
+          if(strncmp(cp, "RST", 200) == 0){
+            client.println("OK");
+            next_state = s_init;
+            return;
+          } else if(MatchCommand("APSSID=", &cp)){ // Set AP SSID
+            int len = strlen(cp);
+            if(len == 0 || len > WiFiSSIDLen - 1){
+              client.println("ERROR: Wrong size.");
+            } else {
+              EEPROM_WriteStr(ADDR_SSID, cp, WiFiSSIDLen - 1);
+              client.println("OK");
+            }
+          } else if(MatchCommand("APPSW=", &cp)){ // Set AP password, if no password, send command "APPSW=".
+            int len = strlen(cp);
+            if(len > WiFiPSWLen - 1){
+              client.println("ERROR: Wrong size.");
+            } else {
+              EEPROM_WriteStr(ADDR_PSW, cp, WiFiPSWLen - 1);
+              client.println("OK");
+            }
+          } else {
+            client.println("ERROR: Unknown command.");
+          }
+          
+        } else {
+          if(index >= 201) {
+            // Error, too long
+            index = 0;
+            client.println("ERROR: Command too long.");
+            DBG("Error: Command too long.\n\r");
+            client.flush();
+          } else {
+            command[index] = c;
+            index++;
+          }
+        }
+      }
+    }
+  }
 }
 
