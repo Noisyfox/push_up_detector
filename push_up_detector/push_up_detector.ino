@@ -1,3 +1,5 @@
+#include <SoftwareSerial.h>
+
 #include <TFT.h> // Hardware-specific library
 #include <SPI.h>
 
@@ -78,6 +80,8 @@ public:
 #define PIN_TRIG 6
 #define PIN_ECHO 7
 #define PIN_BTN_MAIN 2 // interrupt can only be triggered on Pin 2 and 3
+#define PIN_WIFI_RX 3
+#define PIN_WIFI_TX 4
 
 // defines buttons
 Btn mainBtn(PIN_BTN_MAIN, 2000);
@@ -98,6 +102,8 @@ int flag2 = 1;
 TFT screen = TFT(CS, DC, RESET);
 char charBuf[50];
 
+// WiFi serial
+SoftwareSerial wifi(PIN_WIFI_RX, PIN_WIFI_TX);
 
 enum EState{
   s_init,
@@ -127,6 +133,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_BTN_MAIN), mainBtnISR, CHANGE);
 
   Serial.begin(9600); // Starts the serial communication
+  wifi.begin(9600);
 }
 
 void loop() {
@@ -155,6 +162,14 @@ void loop() {
     case s_paring:
       OnParing();
       break;
+  }
+
+  // Bridge usb serial & wifi shield
+  while(wifi.available() > 0){
+    Serial.write(wifi.read());
+  }
+  while(Serial.available() > 0){
+    wifi.write(Serial.read());
   }
 }
 
