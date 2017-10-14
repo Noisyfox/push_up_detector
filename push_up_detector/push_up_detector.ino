@@ -1,3 +1,8 @@
+#include <WiFiEsp.h>
+#include <WiFiEspClient.h>
+#include <WiFiEspServer.h>
+#include <WiFiEspUdp.h>
+
 #include <SoftwareSerial.h>
 
 #include <TFT.h> // Hardware-specific library
@@ -113,37 +118,7 @@ TFT screen = TFT(CS, DC, RESET);
 char charBuf[50];
 
 // WiFi serial
-SoftwareSerial wifi(PIN_WIFI_RX, PIN_WIFI_TX);
-
-// ========================================================================================================
-// Helper functions for WiFi
-
-bool WiFiConfMode(byte a) {
-  wifi.print("AT+CWMODE=");
-  wifi.println(String(a));
-  return WiFiWaitForOK();
-}
-
-bool WiFiWaitForOK() {
-  String data;
-  unsigned long start = millis();
-  while (millis() - start < 2000) {
-    if(wifi.available()>0) {
-      char a = wifi.read();
-      DBGW(a);
-      data = data + a;
-    }
-    if (data.indexOf("OK")!=-1 || data.indexOf("no change")!=-1) {
-      return true;
-    }
-    if (data.indexOf("ERROR")!=-1 || data.indexOf("busy")!=-1) {
-      return false;
-    }
-  }
-  return false;
-}
-
-// ========================================================================================================
+SoftwareSerial wifiSerial(PIN_WIFI_RX, PIN_WIFI_TX);
 
 enum EState{
   s_init,
@@ -185,16 +160,13 @@ void setup() {
   Serial.begin(9600); // Starts the serial communication
 
   // Init WiFi module
-  wifi.begin(9600);
-  wifi.flush();
-  wifi.setTimeout(10000);
-  wifi.println("AT+RST");
-  boolean result = wifi.find("eady");
-  if(result){
-    DBG("Module is ready.\n\r");
-  }else{
+  wifiSerial.begin(9600);
+  WiFi.init(&wifiSerial);
+  if(WiFi.status() == WL_NO_SHIELD){
     DBG("Module have no response.\n\r");
     error("WiFi reset failed.");
+  } else {
+    DBG("Module is ready.\n\r");
   }
 }
 
@@ -235,11 +207,11 @@ void loop() {
   }
 
   // Bridge usb serial & wifi shield
-  while(wifi.available() > 0){
-    Serial.write(wifi.read());
+  while(wifiSerial.available() > 0){
+    Serial.write(wifiSerial.read());
   }
   while(Serial.available() > 0){
-    wifi.write(Serial.read());
+    wifiSerial.write(Serial.read());
   }
 }
 
@@ -294,9 +266,7 @@ void mainBtnISR(){
 
 void ExitInit(){
   // Setup WiFi to station mode and connect to saved AP
-  if(!WiFiConfMode(1)){
-    error("WiFiConfMode(1) failed.");
-  }
+  WiFi.reset();
 }
 
 void EnterStopped(){
@@ -354,18 +324,12 @@ void EnterPairing(){
   screen.text("Pairing...", 20, 30);
   
   // Setup wifi as AP mode and open a port for listening.
-  if(!WiFiConfMode(2)){
-    error("WiFiConfMode(1) failed.");
-  }
-  // Set SSID
-  wifi.print("AT+CWSAP=\"");
   String AP_name = "PUSHUP_";
   for(int i = 0; i < 4; i++){
     AP_name = AP_name + String(random(10));
   }
-  wifi.print(AP_name);
-  wifi.println("\",\"\",11,0,1");
-  if(!WiFiWaitForOK()){
+  AP_name.toCharArray(charBuf, 50);
+  if(WiFi.beginAP(charBuf) != WL_CONNECTED){
     error("Config AP failed.");
   }
   ("SSID:" + AP_name).toCharArray(charBuf, 50);
