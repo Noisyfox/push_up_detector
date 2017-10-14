@@ -170,10 +170,10 @@ void setup() {
   wifiSerial.begin(9600);
   WiFi.init(&wifiSerial);
   if(WiFi.status() == WL_NO_SHIELD){
-    DBG(F("Module have no response.\n\r"));
+    DBG(F("Module have no response.\r\n"));
     error(F("WiFi reset failed."));
   } else {
-    DBG(F("Module is ready.\n\r"));
+    DBG(F("Module is ready.\r\n"));
   }
 }
 
@@ -390,7 +390,7 @@ void OnPairing(){
     while (client.connected()) {
       while(client.available()){
         char c = client.read();
-        if(c == '\r' && index > 0 && command[index-1] == '\n') {
+        if(c == '\n' && index > 0 && command[index-1] == '\r') {
           command[index - 1] = '\0';
           index = 0;
           
@@ -425,7 +425,7 @@ void OnPairing(){
             // Error, too long
             index = 0;
             client.println(F("ERROR: Command too long."));
-            DBG(F("Error: Command too long.\n\r"));
+            DBG(F("Error: Command too long.\r\n"));
             client.flush();
           } else {
             command[index] = c;
