@@ -1,5 +1,5 @@
 #include <EEPROM.h>
-
+#include <PubSubClient.h>
 #include <WiFiEsp.h>
 #include <WiFiEspClient.h>
 #include <WiFiEspServer.h>
@@ -19,6 +19,27 @@
 #define DBG(...)
 #define DBGW(...)
 #endif // DEBUG
+char ssid[20];
+char psw[20];
+
+// Initialize the Wifi client library
+WiFiEspClient wificlient;
+// Initialize the PuBSubClient library
+PubSubClient mqttClient(wificlient);
+// Define the ThingSpeak MQTT broker
+const char* server = "mqtt.thingspeak.com";
+char thingSpeakAddress[] = "api.thingspeak.com";
+String thingtweetAPIKey = "NCX5EZLA59XHS8BG";
+
+// Variable Setup
+//long lastConnectionTime = 0; 
+boolean lastConnected = false;
+int failedCounter = 0;
+
+// track the last connection time
+unsigned long lastConnectionTime = 0; 
+// post data every 20 seconds
+const unsigned long postingInterval = 20L * 1000L;
 
 class Btn {
 private:
@@ -276,8 +297,6 @@ void ExitInit(){
   WiFi.reset();
 
   // Read wifi config
-  char ssid[WiFiSSIDLen];
-  char psw[WiFiPSWLen];
   EEPROM_ReadStr(ADDR_SSID, ssid, WiFiSSIDLen - 1);
   EEPROM_ReadStr(ADDR_PSW, psw, WiFiPSWLen - 1);
   
@@ -291,8 +310,18 @@ void ExitInit(){
 void EnterStopped(){
   screen.background(255, 255, 255);
   screen.stroke(0, 0, 0);
+  screen.text("Uploading...", 30, 30);
+
+  if (count!=0) {
+    mqtt();
+    mqtt_connect();
+  }
+
+  screen.background(255, 255, 255);
+  screen.stroke(0, 0, 0);
   screen.text("Stopped.", 30, 30);
 }
+ 
 
 void EnterCounting(){
   // Clear count number
@@ -367,7 +396,7 @@ boolean MatchCommand(const char* cmd, char** input){
 void EEPROM_WriteStr(int addr, const char* str, int maxLen){
   int len = strlen(str);
   if(len > maxLen)len = maxLen;
-
+  
   for(int i = 0; i < len; i++){
     EEPROM.write(addr + i, str[i]);
   }
@@ -452,3 +481,68 @@ void OnPairing(){
   }
 }
 
+void mqtt() {
+  // Set a temporary WiFi status
+  int status = WL_IDLE_STATUS;
+  // Attempt to connect to WiFi network
+  // Connect to WPA/WPA2 Wi-Fi network
+  while ((status = WiFi.begin(ssid, psw)) != WL_CONNECTED) 
+  {
+    // Wait 10 seconds for connection
+    delay(10000);
+  }
+  
+  Serial.println("Connected to wifi");
+  // Set the MQTT broker details
+  mqttClient.setServer(server, 1883);
+}
+
+void mqtt_connect() {
+  // Check if MQTT client has connected else reconnect
+  mqtt_reconnect();
+
+  // Call the loop continuously to establish connection to the server
+  mqttClient.loop();
+  // If interval time has passed since the last connection, Publish data to ThingSpeak
+  if (millis() - lastConnectionTime > postingInterval) 
+  {
+    mqttpublish();
+  }
+}
+
+void mqtt_reconnect() 
+{
+  // Loop until we're reconnected
+  while (!mqttClient.connected()) 
+  {
+    Serial.print("Attempting MQTT connection...");
+    // Connect to the MQTT broker
+    if (mqttClient.connect("ArduinoWiFiClient")) 
+    {
+      Serial.println("connected");
+    } else 
+    {
+      Serial.print("failed, rc=");
+      // Print to know why the connection failed
+// See http://pubsubclient.knolleary.net/api.html#state for the failure code and its reason
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying to connect again
+      delay(5000);
+    }
+  }
+}
+
+void mqttpublish() {
+  String data = String(count);
+  // Get the data string length
+  int length = data.length();
+  char msgBuffer[length];
+  // Convert data string to character buffer
+  data.toCharArray(msgBuffer,length+1);
+  Serial.println(msgBuffer);
+  // Publish data to ThingSpeak. Replace <YOUR-CHANNEL-ID> with your channel ID and <YOUR-CHANNEL-WRITEAPIKEY> with your write API key
+  mqttClient.publish("channels/351641/publish/fields/field1/KHBH9FZJPGYRG8S0",msgBuffer);
+  // note the last connection time
+  lastConnectionTime = millis();
+}
