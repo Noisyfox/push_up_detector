@@ -36,11 +36,6 @@ String thingtweetAPIKey = "NCX5EZLA59XHS8BG";
 boolean lastConnected = false;
 int failedCounter = 0;
 
-// track the last connection time
-unsigned long lastConnectionTime = 0; 
-// post data every 20 seconds
-const unsigned long postingInterval = 20L * 1000L;
-
 class Btn {
 private:
   volatile byte state = LOW;
@@ -196,12 +191,19 @@ void setup() {
   } else {
     DBG(F("Module is ready.\r\n"));
   }
+  // Set the MQTT broker details
+  mqttClient.setServer(server, 1883);
 }
 
 void loop() {
   EState currentState = state;
   EState nextState = next_state;
   state = nextState;
+  
+  if(mqttClient.connected()){
+    // Call the loop continuously to establish connection to the server
+    mqttClient.loop();
+  }
   
   if(currentState != nextState){
     switch(currentState){
@@ -232,14 +234,6 @@ void loop() {
     case s_pairing:
       OnPairing();
       break;
-  }
-
-  // Bridge usb serial & wifi shield
-  while(wifiSerial.available() > 0){
-    Serial.write(wifiSerial.read());
-  }
-  while(Serial.available() > 0){
-    wifiSerial.write(Serial.read());
   }
 }
 
@@ -308,11 +302,11 @@ void ExitInit(){
 }
 
 void EnterStopped(){
+
+  if (count!=0) {
   screen.background(255, 255, 255);
   screen.stroke(0, 0, 0);
   screen.text("Uploading...", 30, 30);
-
-  if (count!=0) {
     mqtt();
     mqtt_connect();
   }
@@ -482,19 +476,17 @@ void OnPairing(){
 }
 
 void mqtt() {
-  // Set a temporary WiFi status
-  int status = WL_IDLE_STATUS;
   // Attempt to connect to WiFi network
-  // Connect to WPA/WPA2 Wi-Fi network
-  while ((status = WiFi.begin(ssid, psw)) != WL_CONNECTED) 
-  {
-    // Wait 10 seconds for connection
-    delay(10000);
+  if(WiFi.status() != WL_CONNECTED){
+    // Connect to WPA/WPA2 Wi-Fi network
+    while (WiFi.begin(ssid, psw) != WL_CONNECTED) 
+    {
+     // Wait 10 seconds for connection
+      delay(10000);
+    }
   }
-  
+
   Serial.println("Connected to wifi");
-  // Set the MQTT broker details
-  mqttClient.setServer(server, 1883);
 }
 
 void mqtt_connect() {
@@ -503,11 +495,8 @@ void mqtt_connect() {
 
   // Call the loop continuously to establish connection to the server
   mqttClient.loop();
-  // If interval time has passed since the last connection, Publish data to ThingSpeak
-  if (millis() - lastConnectionTime > postingInterval) 
-  {
-    mqttpublish();
-  }
+
+  mqttpublish();
 }
 
 void mqtt_reconnect() 
@@ -515,7 +504,7 @@ void mqtt_reconnect()
   // Loop until we're reconnected
   while (!mqttClient.connected()) 
   {
-    Serial.print("Attempting MQTT connection...");
+    Serial.println("Attempting MQTT connection...");
     // Connect to the MQTT broker
     if (mqttClient.connect("ArduinoWiFiClient")) 
     {
@@ -543,6 +532,4 @@ void mqttpublish() {
   Serial.println(msgBuffer);
   // Publish data to ThingSpeak. Replace <YOUR-CHANNEL-ID> with your channel ID and <YOUR-CHANNEL-WRITEAPIKEY> with your write API key
   mqttClient.publish("channels/351641/publish/fields/field1/KHBH9FZJPGYRG8S0",msgBuffer);
-  // note the last connection time
-  lastConnectionTime = millis();
 }
